@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Domain\Order\OrderRepository;
+use App\Domain\Payment\PaymentContext;
+use App\Domain\Payment\Strategies\OnlinePayment;
+use App\Domain\Payment\Strategies\CashPayment;
 
 class OrderController extends Controller
 {
@@ -17,8 +20,20 @@ class OrderController extends Controller
     }
     public function store(Request $request)
     {
-        $order = $this->orders->create(['amount' => $request->amount,
+        $strategy = match ($request->payment_method) {
+           'online'  => new OnlinePayment() ,
+            'cash' =>  new CashPayment(),
+        };
+        $payment = new PaymentContext($strategy);
+        $paymentResult = $payment->execute($request->amount);
+
+
+        $order = $this->orders->create([
+            'amount' => $request->amount,
             'payment_method' => $request->payment_method,]);
-            return $order;
+            return [
+                'order' => $order,
+                'payment' => $paymentResult,
+            ];
     }
     }
