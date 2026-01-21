@@ -1,8 +1,9 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\OrderController;
 
-// routes/web.php
-Route::get('/', function () {
-    return view('order.create');
-});
+
+//Order routes
+Route::get('/', [OrderController::class, 'create']);
+Route::post('/orders', [OrderController::class, 'store']);
