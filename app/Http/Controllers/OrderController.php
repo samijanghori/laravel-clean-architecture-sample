@@ -1,39 +1,50 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use Illuminate\Http\Request;
+use App\Services\PaymentService;
 use App\Domain\Order\OrderRepository;
-use App\Domain\Payment\PaymentContext;
-use App\Domain\Payment\Strategies\OnlinePayment;
-use App\Domain\Payment\Strategies\CashPayment;
+use App\Events\OrderCreated;
+use App\Http\Requests\StoreOrderRequest;
+
 
 class OrderController extends Controller
 {
-    public function __construct(private OrderRepository $orders)
-    {
-
-    }
+    public function __construct(
+        private OrderRepository $orders,
+        private PaymentService $paymentService
+    ) {}
 
     public function create()
     {
         return view('order.create');
     }
-    public function store(Request $request)
+
+    public function store(StoreOrderRequest $request)
     {
-        $strategy = match ($request->payment_method) {
-           'online'  => new OnlinePayment() ,
-            'cash' =>  new CashPayment(),
-        };
-        $payment = new PaymentContext($strategy);
-        $paymentResult = $payment->execute($request->amount);
+        // 1. اعتبارسنجی
+         $validated = $request->validated();
 
+        // 2. پرداخت
+        $paymentResult = $this->paymentService->process(
+            $request->payment_method,
+            $request->amount
+        );
 
+        // 3. ذخیره سفارش
         $order = $this->orders->create([
             'amount' => $request->amount,
-            'payment_method' => $request->payment_method,]);
-            return [
-                'order' => $order,
-                'payment' => $paymentResult,
-            ];
+            'payment_method' => $request->payment_method,
+        ]);
+
+        // 4. ارسال Event
+        event(new OrderCreated($order));
+
+        // 5. نمایش نتیجه
+        return [
+            'order' => $order,
+            'payment' => $paymentResult,
+        ];
     }
-    }
+}
